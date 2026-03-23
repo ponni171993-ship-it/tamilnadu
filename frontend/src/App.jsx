@@ -9,6 +9,8 @@ function App() {
   const [form, setForm] = useState({ name: '', phone: '', photo: null });
   const [lang, setLang] = useState(i18n.language);
   const [pdfUrl, setPdfUrl] = useState(null);
+  const [badgeUrl, setBadgeUrl] = useState(null);
+  const [registrationData, setRegistrationData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -97,6 +99,8 @@ function App() {
       
       setUploadStage('completed');
       setPdfUrl(res.pdf);
+      setBadgeUrl(res.badge);
+      setRegistrationData(res);
       setShowPopup(false);
       setForm({ name: '', phone: '', photo: null });
     } catch (err) {
@@ -133,16 +137,30 @@ function App() {
       <div className="main-btns">
         <button className="main" onClick={() => setShowPopup(true)}>{t('register')}</button>
         {pdfUrl && (
-          <a
-            href={pdfUrl}
-            className="main"
-            style={{ marginLeft: 16 }}
-            download
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {t('download')}
-          </a>
+          <>
+            <a
+              href={pdfUrl}
+              className="main"
+              style={{ marginLeft: 16 }}
+              download="registration-certificate.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              📄 {t('download')} PDF
+            </a>
+            {badgeUrl && (
+              <a
+                href={badgeUrl}
+                className="main"
+                style={{ marginLeft: 16 }}
+                download="voting-badge.png"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                🗳️ Download Badge
+              </a>
+            )}
+          </>
         )}
       </div>
 
@@ -285,6 +303,30 @@ function App() {
               
               {error && <div style={{ color: 'red', marginTop: 8 }}>{error}</div>}
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Success Message */}
+      {pdfUrl && badgeUrl && (
+        <div className="success-message">
+          <h3>🎉 Registration Successful!</h3>
+          <p>Your certificate and voting badge are ready for download.</p>
+          <div className="download-info">
+            <div className="download-item">
+              <h4>
+                <span className="icon">📄</span>
+                Registration Certificate
+              </h4>
+              <p>Official certificate with your details and photo. Perfect for printing and verification.</p>
+            </div>
+            <div className="download-item">
+              <h4>
+                <span className="icon">🗳️</span>
+                Voting Badge
+              </h4>
+              <p>Show your voting pride with this official Election Commission badge. Perfect for sharing on social media!</p>
+            </div>
           </div>
         </div>
       )}

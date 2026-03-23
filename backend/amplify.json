@@ -1,0 +1,15 @@
+{
+  "version": "3.1",
+  "providers": ["awscloudformation"],
+  "projectName": "tamilnadu-app",
+  "frontend": "javascript",
+  "javascript": {
+    "framework": "react",
+    "config": {
+      "SourceDir": "src",
+      "DistributionDir": "dist",
+      "BuildCommand": "npm run build",
+      "StartCommand": "npm run dev"
+    }
+  }
+}

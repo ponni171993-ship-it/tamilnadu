@@ -36,16 +36,177 @@ body {
 }
 .main {
   font-size: 1.2rem;
-  padding: 12px 32px;
-  border-radius: 6px;
+  padding: 14px 32px;
+  border-radius: 8px;
   border: none;
-  background: #0078d4;
+  background: linear-gradient(135deg, #0078d4, #005fa3);
   color: #fff;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.3s ease;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 120, 212, 0.3);
+  position: relative;
+  overflow: hidden;
 }
+
+.main::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.main:hover::before {
+  left: 100%;
+}
+
 .main:hover {
-  background: #005fa3;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 120, 212, 0.4);
+}
+
+.success-message {
+  background: linear-gradient(135deg, #f8fff8 0%, #e8f5e8 100%);
+  border: 2px solid #28a745;
+  border-radius: 16px;
+  padding: 32px;
+  margin: 20px auto;
+  max-width: 800px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(40, 167, 69, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.success-message::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #28a745, #20c997, #28a745);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.success-message h3 {
+  color: #1e7e34;
+  font-size: 28px;
+  margin-bottom: 12px;
+  font-weight: bold;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.success-message p {
+  color: #495057;
+  font-size: 18px;
+  margin-bottom: 24px;
+  font-weight: 500;
+}
+
+.download-info {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.download-item {
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  border: 1px solid #e9ecef;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.download-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+
+.download-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #007bff, #6610f2);
+  border-radius: 12px 12px 0 0;
+}
+
+.download-item:nth-child(2)::before {
+  background: linear-gradient(90deg, #1e3a8a, #3b82f6);
+}
+
+.download-item h4 {
+  color: #1e293b;
+  font-size: 18px;
+  margin-bottom: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.download-item p {
+  color: #64748b;
+  font-size: 15px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.download-item .icon {
+  font-size: 24px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f8fafc, #e2e8f0);
+}
+
+@media (max-width: 768px) {
+  .download-info {
+    grid-template-columns: 1fr;
+  }
+  
+  .success-message {
+    margin: 20px;
+    padding: 24px;
+  }
+  
+  .success-message h3 {
+    font-size: 24px;
+  }
+  
+  .success-message p {
+    font-size: 16px;
+  }
+  
+  .download-item {
+    padding: 20px;
+  }
+  
+  .download-item h4 {
+    font-size: 16px;
+  }
+  
+  .download-item p {
+    font-size: 14px;
+  }
 }
 
 .popup-overlay {

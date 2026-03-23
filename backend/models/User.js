@@ -19,11 +19,23 @@ const userSchema = new mongoose.Schema({
       message: 'Please enter a valid 10-digit Indian mobile number'
     }
   },
-  // For scalability: store PDF path instead of BLOB
+  // Store local PDF path (S3 disabled)
   pdf_path: { 
     type: String,
     required: [true, 'PDF path is required']
   },
+  
+  // Store user photo path for badge generation
+  photo_path: { 
+    type: String,
+    required: [true, 'Photo path is required']
+  },
+  
+  // Store S3 URL (commented out - using local storage)
+  // pdf_url: { 
+  //   type: String,
+  //   required: [true, 'PDF URL is required']
+  // },
   // Optional: Keep small thumbnail in DB for quick preview
   thumbnail_data: { 
     type: Buffer,

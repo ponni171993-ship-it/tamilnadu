@@ -1,0 +1,27 @@
+# AWS SAM Template for Amplify Function
+Resources:
+  TamilNaduBackendFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: tamilnadu-backend
+      Runtime: nodejs18.x
+      Handler: index.handler
+      CodeUri: .
+      Environment:
+        Variables:
+          NODE_ENV: production
+          MONGODB_URI: ${MONGODB_URI}
+          AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+          AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+          AWS_S3_BUCKET_NAME: ${AWS_S3_BUCKET_NAME}
+          AWS_REGION: ${AWS_REGION}
+      Events:
+        Api:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+      MemorySize: 512
+      Timeout: 30
+      Layers:
+        - !Sub "arn:aws:lambda:${AWS::Region}:094274105915:layer:AWSLambda-Python38-SciPy1x:20"
