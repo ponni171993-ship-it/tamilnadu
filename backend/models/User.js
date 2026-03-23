@@ -19,8 +19,16 @@ const userSchema = new mongoose.Schema({
       message: 'Please enter a valid 10-digit Indian mobile number'
     }
   },
-  photo_path: { type: String, required: true },
-  pdf_path: { type: String },
+  // For scalability: store PDF path instead of BLOB
+  pdf_path: { 
+    type: String,
+    required: [true, 'PDF path is required']
+  },
+  // Optional: Keep small thumbnail in DB for quick preview
+  thumbnail_data: { 
+    type: Buffer,
+    maxlength: [10 * 1024, 'Thumbnail must be less than 10KB']
+  }
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });

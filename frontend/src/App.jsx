@@ -11,6 +11,9 @@ function App() {
   const [pdfUrl, setPdfUrl] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
+  const [uploadStage, setUploadStage] = useState(''); // 'uploading', 'generating', 'completed'
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
@@ -76,8 +79,23 @@ function App() {
     
     setLoading(true);
     setError(null);
+    setUploadProgress(0);
+    setRetryCount(0);
+    setUploadStage('uploading');
+    
     try {
-      const res = await registerUser(form);
+      const res = await registerUser(form, (percent, loaded, total) => {
+        setUploadProgress(percent);
+        if (percent < 30) {
+          setUploadStage('uploading');
+        } else if (percent < 80) {
+          setUploadStage('generating');
+        } else {
+          setUploadStage('processing');
+        }
+      });
+      
+      setUploadStage('completed');
       setPdfUrl(res.pdf);
       setShowPopup(false);
       setForm({ name: '', phone: '', photo: null });
@@ -85,6 +103,8 @@ function App() {
       setError(err.message || 'Registration failed');
     } finally {
       setLoading(false);
+      setUploadProgress(0);
+      setUploadStage('');
     }
   };
 
@@ -200,9 +220,69 @@ function App() {
                 </small>
               </label>
               <div className="popup-actions">
-                <button type="submit" disabled={loading}>{loading ? t('submit') + '...' : t('submit')}</button>
-                <button type="button" onClick={() => setShowPopup(false)}>{t('close')}</button>
+                <button type="submit" disabled={loading}>
+                  {loading ? (
+                    <span>
+                      {uploadStage === 'uploading' && '📤 Uploading...'}
+                      {uploadStage === 'generating' && '📄 Generating PDF...'}
+                      {uploadStage === 'processing' && '⚙️ Processing...'}
+                      {!uploadStage && t('submit') + '...'}
+                    </span>
+                  ) : (
+                    t('submit')
+                  )}
+                </button>
+                <button type="button" onClick={() => setShowPopup(false)} disabled={loading}>
+                  {t('close')}
+                </button>
               </div>
+              
+              {/* Progress Indicator */}
+              {loading && (
+                <div style={{ marginTop: '16px' }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    marginBottom: '8px',
+                    fontSize: '14px',
+                    color: '#666'
+                  }}>
+                    <span>
+                      {uploadStage === 'uploading' && 'Uploading photo...'}
+                      {uploadStage === 'generating' && 'Generating certificate...'}
+                      {uploadStage === 'processing' && 'Finalizing...'}
+                      {uploadStage === 'completed' && '✅ Completed!'}
+                    </span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <div style={{
+                    width: '100%',
+                    height: '8px',
+                    backgroundColor: '#f0f0f0',
+                    borderRadius: '4px',
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      width: `${uploadProgress}%`,
+                      height: '100%',
+                      backgroundColor: uploadStage === 'completed' ? '#28a745' : '#0078d4',
+                      transition: 'width 0.3s ease',
+                      borderRadius: '4px'
+                    }} />
+                  </div>
+                  {retryCount > 0 && (
+                    <div style={{ 
+                      marginTop: '8px', 
+                      fontSize: '12px', 
+                      color: '#ff9800',
+                      textAlign: 'center'
+                    }}>
+                      🔄 Retry attempt {retryCount}/3
+                    </div>
+                  )}
+                </div>
+              )}
+              
               {error && <div style={{ color: 'red', marginTop: 8 }}>{error}</div>}
             </form>
           </div>

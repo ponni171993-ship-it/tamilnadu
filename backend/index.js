@@ -51,7 +51,7 @@ import User from './models/User.js';
 import mongoose from 'mongoose';
 connectMongo();
 
-// Register endpoint
+// Register endpoint with PDF-only storage in database
 app.post('/register', upload.single('photo'), async (req, res) => {
   try {
     const { name, phone } = req.body;
@@ -91,10 +91,8 @@ app.post('/register', upload.single('photo'), async (req, res) => {
         }
       } catch (dbError) {
         console.error('Database query error:', dbError);
-        // Continue with registration even if DB check fails
       }
     } else {
-      // Check in-memory storage for development
       if (registeredPhoneNumbers.has(cleanPhone)) {
         isDuplicate = true;
       }
@@ -104,124 +102,92 @@ app.post('/register', upload.single('photo'), async (req, res) => {
       return res.status(409).json({ error: 'A user with this phone number is already registered' });
     }
     
-    // Create user first to get ID (only if MongoDB is connected)
-    let tempUser;
     try {
-      if (mongoose.connection.readyState === 1) {
-        tempUser = new User({
-          name: name.trim(),
-          phone: phone.trim(),
-          photo_path: 'pending',
-          pdf_path: 'pending'
-        });
-        await tempUser.save();
-      } else {
-        // Generate a mock ID for development without MongoDB
-        tempUser = { _id: `temp_${Date.now()}` };
-      }
-    } catch (validationError) {
-      if (validationError.code === 11000) {
-        return res.status(409).json({ error: 'A user with this phone number already exists' });
-      }
-      return res.status(400).json({ error: validationError.message });
-    }
-    
-    // Upload photo to Cloudinary with proper error handling
-    try {
-      const photoResult = await new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream({
-          folder: 'tamilnadu/photos',
-          resource_type: 'image',
-        }, (error, result) => {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(result);
-          }
-        });
-        
-        uploadStream.on('error', (error) => {
-          reject(error);
-        });
-        
-        uploadStream.end(req.file.buffer);
+      // Generate PDF first
+      const pdfPath = await generateUserPDF({
+        name,
+        phone: cleanPhone, // Pass phone number to PDF
+        photo: req.file.buffer, // Pass photo buffer to PDF
+        userId: `temp_${Date.now()}`, // Temporary ID for PDF generation
+        outputDir: __dirname,
       });
       
-      try {
-        // Generate PDF with actual user ID
-        const pdfPath = await generateUserPDF({
-          name,
-          userId: tempUser._id.toString(),
-          outputDir: __dirname,
+      // Read PDF as buffer
+      const pdfBuffer = fs.readFileSync(pdfPath);
+      
+      // Clean up temporary PDF file
+      fs.unlink(pdfPath, (err) => {
+        if (err) console.error('Failed to clean up temp PDF:', err);
+      });
+      
+      // Save user with PDF data only (if MongoDB is connected)
+      if (mongoose.connection.readyState === 1) {
+        const newUser = new User({
+          name: name.trim(),
+          phone: phone.trim(),
+          pdf_data: pdfBuffer
         });
         
-        try {
-          // Upload PDF to Cloudinary
-          const pdfResult = await new Promise((resolve, reject) => {
-            cloudinary.uploader.upload(pdfPath, {
-              folder: 'tamilnadu/pdfs',
-              resource_type: 'raw',
-            }, (err, pdfResult) => {
-              if (err) reject(err);
-              else resolve(pdfResult);
-            });
-          });
-          
-          try {
-            // Update user with Cloudinary URLs (only if MongoDB is connected)
-            if (mongoose.connection.readyState === 1) {
-              await User.findByIdAndUpdate(tempUser._id, {
-                photo_path: photoResult.secure_url,
-                pdf_path: pdfResult.secure_url
-              }).catch(() => {});
-            }
-            
-            // Clean up local PDF file
-            fs.unlink(pdfPath, (err) => {
-              if (err) console.error('Failed to clean up PDF:', err);
-            });
-            
-            // Add phone number to in-memory storage for development
-            if (mongoose.connection.readyState !== 1) {
-              registeredPhoneNumbers.add(cleanPhone);
-            }
-            
-            res.json({ success: true, id: tempUser._id, pdf: pdfResult.secure_url });
-          } catch (updateError) {
-            console.error('User update error:', updateError);
-            // Clean up user from MongoDB if it was saved
-            if (mongoose.connection.readyState === 1 && tempUser._id.toString().startsWith('temp_') === false) {
-              await User.findByIdAndDelete(tempUser._id).catch(() => {});
-            }
-            throw updateError;
-          }
-        } catch (pdfUploadError) {
-          console.error('PDF upload error:', pdfUploadError);
-          // Clean up user from MongoDB if it was saved
-          if (mongoose.connection.readyState === 1 && tempUser._id.toString().startsWith('temp_') === false) {
-            await User.findByIdAndDelete(tempUser._id).catch(() => {});
-          }
-          throw pdfUploadError;
+        await newUser.save();
+        
+        // Add phone number to in-memory storage for development
+        if (mongoose.connection.readyState !== 1) {
+          registeredPhoneNumbers.add(cleanPhone);
         }
-      } catch (pdfError) {
-        console.error('PDF generation error:', pdfError);
-        // Clean up user from MongoDB if it was saved
-        if (mongoose.connection.readyState === 1 && tempUser._id.toString().startsWith('temp_') === false) {
-          await User.findByIdAndDelete(tempUser._id).catch(() => {});
-        }
-        throw pdfError;
+        
+        // Return PDF as base64 for download
+        const pdfBase64 = pdfBuffer.toString('base64');
+        res.json({ 
+          success: true, 
+          id: newUser._id, 
+          pdf: `data:application/pdf;base64,${pdfBase64}`
+        });
+      } else {
+        // In-memory storage for development without MongoDB
+        const tempId = `temp_${Date.now()}`;
+        registeredPhoneNumbers.add(cleanPhone);
+        
+        // Return PDF as base64 for download
+        const pdfBase64 = pdfBuffer.toString('base64');
+        res.json({ 
+          success: true, 
+          id: tempId, 
+          pdf: `data:application/pdf;base64,${pdfBase64}`
+        });
       }
-    } catch (photoError) {
-      console.error('Photo upload error:', photoError);
-      // Clean up user from MongoDB if it was saved
-      if (mongoose.connection.readyState === 1 && tempUser._id.toString().startsWith('temp_') === false) {
-        await User.findByIdAndDelete(tempUser._id).catch(() => {});
-      }
-      return res.status(500).json({ error: 'Photo upload failed', details: photoError.message });
+      
+    } catch (fileError) {
+      console.error('File processing error:', fileError);
+      return res.status(500).json({ error: 'File processing failed', details: fileError.message });
     }
   } catch (err) {
     console.error('Registration error:', err);
     res.status(500).json({ error: 'Registration failed', details: err.message });
+  }
+});
+
+// Get user data endpoint
+app.get('/user/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (mongoose.connection.readyState === 1) {
+      const user = await User.findById(id);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      
+      res.json({
+        name: user.name,
+        phone: user.phone,
+        created_at: user.created_at
+      });
+    } else {
+      res.status(503).json({ error: 'Database not available' });
+    }
+  } catch (err) {
+    console.error('Get user error:', err);
+    res.status(500).json({ error: 'Failed to retrieve user data' });
   }
 });
 

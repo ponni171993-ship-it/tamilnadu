@@ -2,7 +2,7 @@ import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
 
-export async function generateUserPDF({ name, userId, outputDir }) {
+export async function generateUserPDF({ name, phone, photo, userId, outputDir }) {
   return new Promise((resolve, reject) => {
     const fileName = `user-${userId}.pdf`;
     const filePath = path.join(outputDir, fileName);
@@ -17,12 +17,50 @@ export async function generateUserPDF({ name, userId, outputDir }) {
     doc.moveDown(2);
     doc.fillColor('black').fontSize(18).text('This certifies that:', 50, 140);
 
-    // Dynamic user name
-    doc.fontSize(24).fillColor('#0078d4').text(name, 50, 180, { underline: true });
+    // Add photo if provided
+    if (photo && photo.length > 0) {
+      // Add photo to the right side
+      const photoSize = 120;
+      const photoX = doc.page.width - 50 - photoSize;
+      const photoY = 140;
+      
+      // Draw border for photo
+      doc.rect(photoX - 2, photoY - 2, photoSize + 4, photoSize + 4).stroke('#0078d4');
+      
+      // Add photo (centered in the border)
+      doc.image(photo, photoX, photoY, { 
+        width: photoSize, 
+        height: photoSize,
+        align: 'center',
+        valign: 'center'
+      });
+    }
+
+    // Dynamic user name (adjusted position if photo is present)
+    const nameX = (photo && photo.length > 0) ? 50 : 50;
+    const nameY = (photo && photo.length > 0) ? 140 : 180;
+    
+    doc.fontSize(24).fillColor('#0078d4').text(name, nameX, nameY, { underline: true });
+
+    // Dynamic phone number
+    doc.moveDown(1);
+    const phoneY = (photo && photo.length > 0) ? 280 : 245;
+    doc.fontSize(16).fillColor('black').text('Phone Number:', nameX, phoneY);
+    doc.fontSize(18).fillColor('#0078d4').text(phone, nameX, phoneY + 25);
 
     // More static content
     doc.moveDown(2);
-    doc.fontSize(14).fillColor('black').text('Thank you for registering!', 50, 240);
+    const thankYouY = (photo && photo.length > 0) ? 350 : 300;
+    doc.fontSize(14).fillColor('black').text('Thank you for registering!', nameX, thankYouY);
+    
+    // Add registration date
+    const registrationDate = new Date().toLocaleDateString('en-IN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    doc.fontSize(12).fillColor('gray').text(`Registration Date: ${registrationDate}`, nameX, thankYouY + 50);
+    
     doc.end();
 
     stream.on('finish', () => resolve(filePath));
