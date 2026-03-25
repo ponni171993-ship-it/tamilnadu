@@ -20,10 +20,10 @@ applications:
       phases:
         preBuild:
           commands:
-            - cd backend && npm install
+            - npm install
         build:
           commands:
-            - cd backend && npm install
+            - npm install
       artifacts:
         baseDirectory: backend
         files:
@@ -31,3 +31,13 @@ applications:
       cache:
         paths:
           - backend/node_modules/**/*
+functions:
+  registerUser:
+    runtime: nodejs18.x
+    handler: index.handler
+    environment:
+      MONGODB_URI: ${MONGODB_URI}
+      _AWS_ACCESS_KEY_ID: ${_AWS_ACCESS_KEY_ID}
+      _AWS_SECRET_ACCESS_KEY: ${_AWS_SECRET_ACCESS_KEY}
+      _AWS_REGION: ${_AWS_REGION}
+      _AWS_S3_BUCKET_NAME: ${_AWS_S3_BUCKET_NAME}
