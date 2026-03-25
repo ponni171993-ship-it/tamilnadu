@@ -1,6 +1,12 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { uploadPhotoToS3, uploadBadgeToS3, uploadPDFToS3, listS3Files } from './s3Util.js';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Test S3 Integration
 async function testS3Integration() {

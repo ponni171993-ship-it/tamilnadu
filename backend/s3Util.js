@@ -6,23 +6,23 @@ dotenv.config();
 
 // Use environment variables from AWS Amplify
 const s3Client = new S3Client({
-  region: process.env.AWS_REGION || 'eu-north-1',
+  region: process.env._AWS_REGION || 'eu-north-1',
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+    accessKeyId: process.env._AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env._AWS_SECRET_ACCESS_KEY
   },
   forcePathStyle: true
 });
 
-const BUCKET_NAME = process.env.AWS_S3_BUCKET_NAME;
+const BUCKET_NAME = process.env._AWS_S3_BUCKET_NAME;
 
 // Validate S3 configuration
 if (!BUCKET_NAME) {
   throw new Error('AWS_S3_BUCKET_NAME environment variable is required');
 }
 
-if (!process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY) {
-  throw new Error('AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables are required');
+if (!process.env._AWS_ACCESS_KEY_ID || !process.env._AWS_SECRET_ACCESS_KEY) {
+  throw new Error('_AWS_ACCESS_KEY_ID and _AWS_SECRET_ACCESS_KEY environment variables are required');
 }
 
 // Upload PDF to S3
