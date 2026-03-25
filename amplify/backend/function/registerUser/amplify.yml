@@ -3,10 +3,10 @@ backend:
   phases:
     preBuild:
       commands:
-        - npm install express multer cors dotenv @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
+        - npm install busboy pdfkit @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
     build:
       commands:
-        - echo "Build completed"
+        - echo "Lambda function built successfully"
   runtime:
     name: nodejs18.x
   environment:

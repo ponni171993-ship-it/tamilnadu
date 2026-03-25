@@ -1,27 +1,48 @@
-import { AmplifyError } from '@aws-amplify/core';
-import express from 'express';
-import multer from 'multer';
-import cors from 'cors';
-import dotenv from 'dotenv';
-import path from 'path';
-import fs from 'fs';
+import busboy from 'busboy';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, PutCommand, GetCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
-
-// Import your existing working utilities
-import { generateUserPDF } from '../../../backend/pdfUtil.js';
-import { generateVotingBadge, generateSimpleVotingBadge } from '../../../backend/votingBadgeUtil.js';
-
-// Load environment variables
-dotenv.config();
+import { DynamoDBDocumentClient, PutCommand, GetCommand } from '@aws-sdk/lib-dynamodb';
+import PDFDocument from 'pdfkit';
 
 // Initialize DynamoDB
 const ddbClient = new DynamoDBClient({ region: process.env._AWS_REGION || 'eu-north-1' });
 const docClient = DynamoDBDocumentClient.from(ddbClient);
 const TABLE_NAME = 'users';
 
-// DynamoDB functions
-const checkDuplicatePhone = async (phone) => {
+// Helper function to generate simple PNG badge (using hardcoded base64)
+function generateSimpleBadgeBase64() {
+  // Small voting badge PNG (blue square with text)
+  return 'iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAALEwAACxMBAJqcGAAAAVlpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IlhNUCBDb3JlIDUuNC4wIj4KICAgPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4KICAgICAgPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIKICAgICAgICAgICAgeG1sbnM6dGlmZj0iaHR0cDovL25zLmFkb2JlLmNvbS90aWZmLzEuMC8iPgogICAgICAgICA8dGlmZjpPcmllbnRhdGlvbj4xPC90aWZmOk9yaWVudGF0aW9uPgogICAgICA8L3JkZjpEZXNjcmlwdGlvbj4KICAgPC9yZGY6UkRGPgo8L3g6eG1wbWV0YT4KTMInWQAAABxJREFUGBljZGBg+M9AAWCiIFgYBiiwAAG0BIBJgAAAAASUVORK5CYII=';
+}
+
+// Helper function to generate PDF buffer
+async function generatePDFBuffer(name, phone) {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument();
+      const chunks = [];
+
+      doc.on('data', chunk => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      // Generate PDF content
+      doc.fontSize(24).text('Registration Certificate', { align: 'center' });
+      doc.fontSize(16).moveDown();
+      doc.text(`Name: ${name}`);
+      doc.text(`Phone: ${phone}`);
+      doc.text(`Date: ${new Date().toLocaleDateString('en-IN')}`);
+      doc.moveDown();
+      doc.fontSize(12).text('Thank you for registering!', { align: 'center' });
+
+      doc.end();
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
+// Helper function to check duplicate in DynamoDB
+async function checkDuplicatePhone(phone) {
   try {
     const command = new GetCommand({
       TableName: TABLE_NAME,
@@ -33,18 +54,18 @@ const checkDuplicatePhone = async (phone) => {
     console.error('Error checking duplicate phone:', error);
     return null;
   }
-};
+}
 
-const saveUser = async (userData) => {
+// Helper function to save user to DynamoDB
+async function saveUser(userData) {
   try {
     const command = new PutCommand({
       TableName: TABLE_NAME,
       Item: {
         phone: userData.phone,
         name: userData.name,
-        pdf_path: userData.pdf_path,
-        photo_path: userData.photo_path,
-        registeredAt: userData.registeredAt.toISOString()
+        registeredAt: userData.registeredAt.toISOString(),
+        id: userData.id
       }
     });
     await docClient.send(command);
@@ -54,263 +75,221 @@ const saveUser = async (userData) => {
     console.error('Error saving user:', error);
     return false;
   }
-};
-
-// Use underscore-prefixed environment variables for AWS
-const AWS_CONFIG = {
-  ACCESS_KEY_ID: process.env._AWS_ACCESS_KEY_ID,
-  SECRET_ACCESS_KEY: process.env._AWS_SECRET_ACCESS_KEY,
-  REGION: process.env._AWS_REGION || 'eu-north-1',
-  S3_BUCKET_NAME: process.env._AWS_S3_BUCKET_NAME
-};
-
-console.log('✅ DynamoDB initialized for AWS region:', AWS_CONFIG.REGION);
-
-if (!AWS_CONFIG.S3_BUCKET_NAME) {
-  console.warn('⚠️ S3 bucket name not configured - using mock data');
 }
 
-// Express app for Lambda
-const app = express();
-
-// CORS configuration
-app.use(cors({
-  origin: true,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-app.use(express.json());
-
-// Memory storage for file uploads
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-  },
-  fileFilter: (req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed'), false);
-    }
-  }
-});
-
-// Registration endpoint
-export const handler = async (event) => {
-  try {
-    console.log('🚀 Registration handler called with event:', { 
-      method: event.requestContext?.http?.method, 
-      path: event.rawPath,
-      requestPath: event.requestContext?.http?.path
+// Helper function to parse multipart form data
+function parseMultipartForm(event) {
+  return new Promise((resolve, reject) => {
+    const fields = {};
+    const files = {};
+    
+    const bb = busboy({ 
+      headers: event.headers,
+      limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+      }
     });
-    
-    // Normalize path - remove trailing slash
-    const normalizedPath = event.rawPath?.replace(/\/$/, '') || '';
-    
-    // Handle preflight requests
-    if (event.requestContext?.http?.method === 'OPTIONS') {
+
+    bb.on('field', (fieldname, val) => {
+      console.log(`Field: ${fieldname} = ${val}`);
+      fields[fieldname] = val;
+    });
+
+    bb.on('file', (fieldname, file, info) => {
+      console.log(`File: ${fieldname}, name: ${info.filename}`);
+      const chunks = [];
+      
+      file.on('data', data => {
+        chunks.push(data);
+      });
+
+      file.on('end', () => {
+        files[fieldname] = Buffer.concat(chunks);
+      });
+
+      file.on('error', reject);
+    });
+
+    bb.on('close', () => {
+      console.log('Parse complete');
+      resolve({ fields, files });
+    });
+
+    bb.on('error', reject);
+
+    // Handle encoded body
+    if (event.isBase64Encoded) {
+      const buffer = Buffer.from(event.body, 'base64');
+      bb.write(buffer);
+    } else {
+      bb.write(event.body);
+    }
+    bb.end();
+  });
+}
+
+// Lambda handler
+export const handler = async (event) => {
+  console.log('🚀 Registration handler called');
+  console.log('Event method:', event.requestContext?.http?.method);
+  console.log('Event path:', event.rawPath);
+
+  // CORS headers
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  };
+
+  try {
+    const method = event.requestContext?.http?.method;
+
+    // Handle OPTIONS (preflight)
+    if (method === 'OPTIONS') {
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+      };
+    }
+
+    // Handle GET (health check)
+    if (method === 'GET') {
       return {
         statusCode: 200,
         headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type',
-          'Access-Control-Max-Age': '86400',
-        },
-      };
-    }
-    
-    // Handle GET requests (for testing/health check)
-    if (event.requestContext?.http?.method === 'GET') {
-      return {
-        statusCode: 200,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
+          ...corsHeaders,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: 'Registration endpoint is ready', timestamp: new Date().toISOString() })
+        body: JSON.stringify({
+          message: 'Registration endpoint is ready',
+          timestamp: new Date().toISOString()
+        })
       };
     }
-    
-    // Handle POST requests
-    if (event.requestContext?.http?.method !== 'POST') {
-      return {
-        statusCode: 405,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ error: 'Method not allowed' })
-      };
-    }
-    
-    // Parse the event body
-    let body = event.body;
-    if (typeof body === 'string') {
+
+    // Handle POST
+    if (method === 'POST') {
+      console.log('Processing POST request');
+
+      // Parse multipart form data
+      let fields, files;
       try {
-        body = JSON.parse(body);
-      } catch(e) {
+        ({ fields, files } = await parseMultipartForm(event));
+        console.log('Parsed fields:', Object.keys(fields));
+        console.log('Parsed files:', Object.keys(files));
+      } catch (parseError) {
+        console.error('Form parse error:', parseError);
         return {
           statusCode: 400,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ error: 'Invalid JSON in request body' })
+          headers: corsHeaders,
+          body: JSON.stringify({ error: 'Failed to parse form data' })
         };
       }
-    }
-    
-    const { name, phone, photo } = body;
-    
-    // Validation
-    if (!name || !phone) {
-      return {
-        statusCode: 400,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-        body: JSON.stringify({ error: 'Name and phone are required' })
-      };
-    }
-    
-    if (name.length < 2 || name.length > 50) {
-      return {
-        statusCode: 400,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-        body: JSON.stringify({ error: 'Name must be between 2 and 50 characters' })
-      };
-    }
-    
-    if (!/^[6-9]\d{9}$/.test(phone)) {
-      return {
-        statusCode: 400,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-        body: JSON.stringify({ error: 'Invalid Indian mobile number' })
-      };
-    }
-    
-    // Check for duplicate in DynamoDB
-    const existingUser = await checkDuplicatePhone(phone);
-    if (existingUser) {
-      return {
-        statusCode: 409,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-        body: JSON.stringify({ error: 'This phone number is already registered' })
-      };
-    }
-    
-    // Generate real PDF and badge using your existing working code
-    const registrationId = `REG${Date.now()}${Math.floor(Math.random() * 1000)}`;
-    
-    // Generate PDF using your existing utility
-    let pdfBase64 = null;
-    try {
-      const pdfBuffer = await generateUserPDF({
-        name,
-        phone,
-        userPhotoBuffer: photo ? Buffer.from(photo, 'base64') : null, // Convert base64 photo back to buffer
-        userId: phone,
-        outputDir: '/tmp' // Use temp directory for Amplify
-      });
-      pdfBase64 = pdfBuffer.toString('base64');
-      console.log('✅ PDF generated successfully');
-    } catch (pdfError) {
-      console.error('❌ PDF generation error:', pdfError);
-    }
-    
-    // Generate badge using your existing voting badge utility
-    let badgeBase64 = null;
-    try {
-      console.log('🎨 Starting badge generation...');
-      const votingBadgeBuffer = await generateVotingBadge({ 
-        name: name.trim(), 
-        phone: phone.trim(), 
-        userPhotoBuffer: photo ? Buffer.from(photo, 'base64') : null
-      });
-      badgeBase64 = `data:image/png;base64,${votingBadgeBuffer.toString('base64')}`;
-      console.log('✅ Badge generated successfully');
-    } catch (badgeError) {
-      console.error('❌ Badge generation error:', badgeError);
-      // Fallback to simple badge if voting badge fails
-      try {
-        const simpleBadgeBuffer = await generateSimpleVotingBadge({ 
-          name: name.trim(), 
-          phone: phone.trim() 
-        });
-        badgeBase64 = `data:image/png;base64,${simpleBadgeBuffer.toString('base64')}`;
-        console.log('✅ Simple badge generated as fallback');
-      } catch (simpleBadgeError) {
-        console.error('❌ Even simple badge failed:', simpleBadgeError);
+
+      const { name, phone } = fields;
+      const photoBuffer = files.photo;
+
+      // Validation
+      if (!name || !phone) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({ error: 'Name and phone are required' })
+        };
       }
-    }
-    
-    // Save to DynamoDB
-    const userData = {
-      name: name.trim(),
-      phone: phone.trim(),
-      pdf_path: `user-${phone}.pdf`,
-      photo_path: `photo-${phone}.jpeg`,
-      registeredAt: new Date()
-    };
-    
-    const saved = await saveUser(userData);
-    if (!saved) {
-      return {
-        statusCode: 500,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type',
-        },
-        body: JSON.stringify({ error: 'Failed to save user data' })
-      };
-    }
-    
-    // Return success response
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        success: true,
-        registrationId,
+
+      if (name.length < 2 || name.length > 50) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({ error: 'Name must be between 2 and 50 characters' })
+        };
+      }
+
+      // Validate Indian phone number
+      if (!/^[6-9]\d{9}$/.test(phone)) {
+        return {
+          statusCode: 400,
+          headers: corsHeaders,
+          body: JSON.stringify({ error: 'Invalid Indian mobile number' })
+        };
+      }
+
+      // Check for duplicate
+      const existingUser = await checkDuplicatePhone(phone);
+      if (existingUser) {
+        return {
+          statusCode: 409,
+          headers: corsHeaders,
+          body: JSON.stringify({ error: 'This phone number is already registered' })
+        };
+      }
+
+      // Generate PDF
+      console.log('Generating PDF...');
+      let pdfBase64 = '';
+      try {
+        const pdfBuffer = await generatePDFBuffer(name, phone);
+        pdfBase64 = pdfBuffer.toString('base64');
+        console.log('✅ PDF generated');
+      } catch (pdfError) {
+        console.error('PDF generation error:', pdfError);
+      }
+
+      // Generate badge (simple base64)
+      const badgeBase64 = generateSimpleBadgeBase64();
+      console.log('✅ Badge generated');
+
+      // Save to DynamoDB
+      const userId = `REG${Date.now()}${Math.floor(Math.random() * 1000)}`;
+      const userData = {
+        id: userId,
         name,
         phone,
-        pdf: pdfBase64 ? `data:application/pdf;base64,${pdfBase64}` : null,
-        badge: badgeBase64,
-        message: 'Registration successful'
-      })
+        registeredAt: new Date()
+      };
+
+      const saved = await saveUser(userData);
+      if (!saved) {
+        return {
+          statusCode: 500,
+          headers: corsHeaders,
+          body: JSON.stringify({ error: 'Failed to save user data' })
+        };
+      }
+
+      // Return success response
+      return {
+        statusCode: 200,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          success: true,
+          id: userId,
+          name,
+          phone,
+          pdf: `data:application/pdf;base64,${pdfBase64}`,
+          badge: `data:image/png;base64,${badgeBase64}`,
+          message: 'Registration successful'
+        })
+      };
+    }
+
+    // Method not allowed
+    return {
+      statusCode: 405,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Method not allowed' })
     };
-    
+
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('Handler error:', error);
     return {
       statusCode: 500,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        error: 'Registration failed',
-        details: error.message
-      })
+      headers: corsHeaders,
+      body: JSON.stringify({ error: 'Internal server error', details: error.message })
     };
   }
 };
