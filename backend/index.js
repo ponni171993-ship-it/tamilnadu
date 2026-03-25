@@ -155,7 +155,7 @@ app.get('/', (req, res) => {
 });
 
 // Register endpoint with PDF-only storage in database
-app.post('/register', upload.single('photo'), async (req, res) => {
+app.post('/api/register', upload.single('photo'), async (req, res) => {
   try {
     const { name, phone } = req.body;
     

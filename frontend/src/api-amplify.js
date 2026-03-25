@@ -12,7 +12,7 @@ export async function registerUser(form, onProgress) {
   try {
     // Determine the correct endpoint based on environment
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const endpoint = isLocalhost ? 'http://localhost:4000/register' : '/api/register';
+    const endpoint = isLocalhost ? 'http://localhost:4000/api/register' : '/api/register';
     
     console.log(`📡 Calling API endpoint: ${endpoint} (localhost: ${isLocalhost})`);
     
