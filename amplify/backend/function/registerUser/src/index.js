@@ -101,7 +101,14 @@ const upload = multer({
 // Registration endpoint
 export const handler = async (event) => {
   try {
-    console.log('🚀 Registration handler called with event:', { method: event.requestContext?.http?.method, path: event.rawPath });
+    console.log('🚀 Registration handler called with event:', { 
+      method: event.requestContext?.http?.method, 
+      path: event.rawPath,
+      requestPath: event.requestContext?.http?.path
+    });
+    
+    // Normalize path - remove trailing slash
+    const normalizedPath = event.rawPath?.replace(/\/$/, '') || '';
     
     // Handle preflight requests
     if (event.requestContext?.http?.method === 'OPTIONS') {
@@ -111,6 +118,7 @@ export const handler = async (event) => {
           'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Max-Age': '86400',
         },
       };
     }
