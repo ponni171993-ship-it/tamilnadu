@@ -41,8 +41,6 @@ functions:
       _AWS_REGION: ${_AWS_REGION}
       _AWS_S3_BUCKET_NAME: ${_AWS_S3_BUCKET_NAME}
     apiGateway:
-      restApiId: !Ref APIGateway
-      restApiRootResourceId: !Ref APIGatewayRootResourceId
       path: /register
       method: POST
     iamRoleStatements:
