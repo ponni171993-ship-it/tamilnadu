@@ -3,7 +3,7 @@ backend:
   phases:
     preBuild:
       commands:
-        - npm install busboy pdfkit @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
+        - npm install
     build:
       commands:
         - echo "Lambda function built successfully"
