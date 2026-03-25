@@ -101,10 +101,62 @@ const upload = multer({
 // Registration endpoint
 export const handler = async (event) => {
   try {
-    console.log('🚀 Registration handler called with DynamoDB');
+    console.log('🚀 Registration handler called with event:', { method: event.requestContext?.http?.method, path: event.rawPath });
+    
+    // Handle preflight requests
+    if (event.requestContext?.http?.method === 'OPTIONS') {
+      return {
+        statusCode: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        },
+      };
+    }
+    
+    // Handle GET requests (for testing/health check)
+    if (event.requestContext?.http?.method === 'GET') {
+      return {
+        statusCode: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ message: 'Registration endpoint is ready', timestamp: new Date().toISOString() })
+      };
+    }
+    
+    // Handle POST requests
+    if (event.requestContext?.http?.method !== 'POST') {
+      return {
+        statusCode: 405,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ error: 'Method not allowed' })
+      };
+    }
     
     // Parse the event body
-    const { name, phone, photo } = JSON.parse(event.body);
+    let body = event.body;
+    if (typeof body === 'string') {
+      try {
+        body = JSON.parse(body);
+      } catch(e) {
+        return {
+          statusCode: 400,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ error: 'Invalid JSON in request body' })
+        };
+      }
+    }
+    
+    const { name, phone, photo } = body;
     
     // Validation
     if (!name || !phone) {
@@ -162,7 +214,7 @@ export const handler = async (event) => {
       const pdfBuffer = await generateUserPDF({
         name,
         phone,
-        userPhotoBuffer: Buffer.from(photo, 'base64'), // Convert base64 photo back to buffer
+        userPhotoBuffer: photo ? Buffer.from(photo, 'base64') : null, // Convert base64 photo back to buffer
         userId: phone,
         outputDir: '/tmp' // Use temp directory for Amplify
       });
@@ -179,7 +231,7 @@ export const handler = async (event) => {
       const votingBadgeBuffer = await generateVotingBadge({ 
         name: name.trim(), 
         phone: phone.trim(), 
-        userPhotoBuffer: Buffer.from(photo, 'base64') 
+        userPhotoBuffer: photo ? Buffer.from(photo, 'base64') : null
       });
       badgeBase64 = `data:image/png;base64,${votingBadgeBuffer.toString('base64')}`;
       console.log('✅ Badge generated successfully');
@@ -225,6 +277,7 @@ export const handler = async (event) => {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         success: true,
@@ -244,6 +297,7 @@ export const handler = async (event) => {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type',
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         error: 'Registration failed',

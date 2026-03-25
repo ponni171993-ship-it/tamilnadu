@@ -10,8 +10,14 @@ export async function registerUser(form, onProgress) {
   }
 
   try {
+    // Determine the correct endpoint based on environment
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    const endpoint = isLocalhost ? 'http://localhost:4000/register' : '/api/registerUser';
+    
+    console.log(`📡 Calling API endpoint: ${endpoint} (localhost: ${isLocalhost})`);
+    
     // Call Amplify function
-    const response = await fetch('/api/registerUser', {
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

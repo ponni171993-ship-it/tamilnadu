@@ -41,8 +41,8 @@ functions:
       _AWS_REGION: ${_AWS_REGION}
       _AWS_S3_BUCKET_NAME: ${_AWS_S3_BUCKET_NAME}
     apiGateway:
-      path: /register
-      method: POST
+      path: /registerUser
+      method: [GET, POST]
     iamRoleStatements:
       - Effect: Allow
         Action:
