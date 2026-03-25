@@ -46,7 +46,7 @@ export async function registerUser(form, onProgress) {
 
     // Use different URLs for local development vs production
     const apiUrl = window.location.hostname === 'localhost' 
-      ? 'http://localhost:4000/register' 
+      ? 'http://localhost:4000/api/register' 
       : '/api/register'; // Vercel Serverless Function
     
     xhr.open('POST', apiUrl);
