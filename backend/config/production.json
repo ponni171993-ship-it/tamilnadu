@@ -1,0 +1,14 @@
+{
+  "database": {
+    "mongodbUri": "mongodb+srv://ponni171993_db_user:qCvw6GGL7ArVc9PQ@tamilnadu.kzlddck.mongodb.net/?appName"
+  },
+  "aws": {
+    "region": "eu-north-1",
+    "s3Bucket": "tamilnadu-voting-app-bucket"
+  },
+  "app": {
+    "port": 4000,
+    "environment": "production",
+    "logLevel": "info"
+  }
+}

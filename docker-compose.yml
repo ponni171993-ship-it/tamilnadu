@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  app:
+    build: ./backend
+    ports:
+      - "4000:4000"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb+srv://ponni171993_db_user:qCvw6GGL7ArVc9PQ@tamilnadu.kzlddck.mongodb.net/?appName
+      - AWS_REGION=eu-north-1
+      - AWS_S3_BUCKET_NAME=tamilnadu-voting-app-bucket
+      # AWS credentials would be injected via Docker secrets or IAM roles
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+
+  mongodb:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password123
+    volumes:
+      - mongodb_data:/data/db
+
+volumes:
+  mongodb_data:
