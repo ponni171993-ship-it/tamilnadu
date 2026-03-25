@@ -44,12 +44,26 @@ export async function registerUser(form, onProgress) {
       reject(new Error('Network error - failed to connect to server'));
     });
 
-    // Use environment variable or construct based on hostname
-    const apiUrl = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' 
-      ? 'http://localhost:4000/api/register/' 
-      : 'https://dynamodb.execute-api.eu-north-1.amazonaws.com/api/register/');
+    // Construct API URL based on current environment
+    let apiUrl = import.meta.env.VITE_API_URL;
+    
+    if (!apiUrl) {
+      if (window.location.hostname === 'localhost') {
+        // Local development
+        apiUrl = 'http://localhost:4000/api/register/';
+      } else if (window.location.hostname.includes('amplifyapp.com')) {
+        // Amplify deployed app - use current domain
+        const domain = window.location.hostname;
+        const protocol = window.location.protocol;
+        apiUrl = `${protocol}//${domain}/api/register/`;
+      } else {
+        // Fallback for other environments
+        apiUrl = `${window.location.protocol}//${window.location.host}/api/register/`;
+      }
+    }
     
     console.log('📡 API URL:', apiUrl);
+    console.log('🌍 Current hostname:', window.location.hostname);
     
     xhr.open('POST', apiUrl);
     xhr.send(formData);
