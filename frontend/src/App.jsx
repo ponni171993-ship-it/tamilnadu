@@ -1,21 +1,16 @@
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import './App.css';
-import { registerUser } from './api';
 
 function App() {
-  const { t, i18n } = useTranslation();
   const [showPopup, setShowPopup] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', photo: null });
-  const [lang, setLang] = useState(i18n.language);
   const [pdfUrl, setPdfUrl] = useState(null);
   const [badgeUrl, setBadgeUrl] = useState(null);
   const [registrationData, setRegistrationData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [retryCount, setRetryCount] = useState(0);
-  const [uploadStage, setUploadStage] = useState(''); // 'uploading', 'generating', 'completed'
+  const [uploadStage, setUploadStage] = useState('');
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
