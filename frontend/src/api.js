@@ -44,10 +44,12 @@ export async function registerUser(form, onProgress) {
       reject(new Error('Network error - failed to connect to server'));
     });
 
-    // Use different URLs for local development vs production
-    const apiUrl = window.location.hostname === 'localhost' 
-      ? 'http://localhost:4000/api/register' 
-      : '/api/register'; // Vercel Serverless Function
+    // Use environment variable or construct based on hostname
+    const apiUrl = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' 
+      ? 'http://localhost:4000/api/register/' 
+      : 'https://dynamodb.execute-api.eu-north-1.amazonaws.com/api/register/');
+    
+    console.log('📡 API URL:', apiUrl);
     
     xhr.open('POST', apiUrl);
     xhr.send(formData);
