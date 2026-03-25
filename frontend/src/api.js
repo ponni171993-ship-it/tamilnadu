@@ -1,5 +1,6 @@
-// Mock API for AWS Amplify deployment
+// Mock API for AWS Amplify deployment - Version 2.0
 export async function registerUser(form, onProgress) {
+  console.log('🚀 Using Mock API v2.0 for AWS Amplify');
   // Simulate progress tracking
   if (onProgress && typeof onProgress === 'function') {
     const progressSteps = [10, 25, 50, 75, 90, 100];
