@@ -47,7 +47,7 @@ export async function registerUser(form, onProgress) {
     // Use different URLs for local development vs AWS Amplify
     const apiUrl = window.location.hostname === 'localhost' 
       ? 'http://localhost:4000/register' 
-      : '/api/registerUser'; // Amplify Function URL (matches function name)
+      : '/register'; // Amplify Function API Gateway path
     
     xhr.open('POST', apiUrl);
     xhr.send(formData);
