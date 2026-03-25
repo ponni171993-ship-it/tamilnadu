@@ -248,20 +248,34 @@ app.post(['/api/register', '/api/register/'], upload.single('photo'), async (req
       }
       
       // Return PDF as base64 for download
-      const pdfBuffer = fs.readFileSync(pdfPath);
-      const pdfBase64 = pdfBuffer.toString('base64');
+      let pdfBase64 = '';
+      try {
+        const pdfBuffer = fs.readFileSync(pdfPath);
+        if (!pdfBuffer || pdfBuffer.length === 0) {
+          console.warn('⚠️ PDF buffer is empty');
+          pdfBase64 = '';
+        } else {
+          pdfBase64 = pdfBuffer.toString('base64');
+          console.log(`✅ PDF converted to base64 (${pdfBase64.length} characters)`);
+        }
+      } catch (pdfReadError) {
+        console.error('❌ Error reading PDF file:', pdfReadError.message);
+        pdfBase64 = '';
+      }
       
       // Generate simple badge placeholder (canvas disabled)
       let badgeBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAALEwAACxMBAJqcGAAAAVlpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IlhNUCBDb3JlIDUuNC4wIj4KICAgPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4KICAgICAgPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIKICAgICAgICAgICAgeG1sbnM6dGlmZj0iaHR0cDovL25zLmFkb2JlLmNvbS90aWZmLzEuMC8iPgogICAgICAgICA8dGlmZjpPcmllbnRhdGlvbj4xPC90aWZmOk9yaWVudGF0aW9uPgogICAgICA8L3JkZjpEZXNjcmlwdGlvbj4KICAgPC9yZGY6UkRGPgo8L3g6eG1wbWV0YT4KTMInWQAAABxJREFUGBljZGBg+M9AAWCiIFgYBiiwAAG0BIBJgAAAAASUVORK5CYII=';
-      console.log('🎨 Using placeholder badge (canvas module disabled)');
+      console.log('🎨 Using placeholder badge');
       
       res.json({ 
         success: true, 
-        id: cleanPhone, // Use phone number as ID
-        pdf: `data:application/pdf;base64,${pdfBase64}`,
-        pdf_path: `/uploads/${pdfFileName}`, // Local path
-        badge: badgeBase64, // Voting badge as base64
-        badge_style: 'voting', // Badge style info
+        id: cleanPhone,
+        name,
+        phone: cleanPhone,
+        pdf: pdfBase64 ? `data:application/pdf;base64,${pdfBase64}` : null,
+        pdf_path: `/uploads/${pdfFileName}`,
+        badge: badgeBase64,
+        badge_style: 'voting'
       });
       
     } catch (fileError) {

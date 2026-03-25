@@ -3,6 +3,61 @@ import './App.css';
 import { t, getCurrentLanguage } from './translations.js';
 import { registerUser } from './api.js';
 
+// Helper function to download data URLs as files
+function downloadDataUrl(dataUrl, filename) {
+  try {
+    // Validate input
+    if (!dataUrl || typeof dataUrl !== 'string') {
+      throw new Error('Invalid data URL');
+    }
+
+    // Check if it's actually a data URL
+    if (!dataUrl.startsWith('data:')) {
+      throw new Error('Not a data URL');
+    }
+
+    // Parse the data URL
+    const parts = dataUrl.split(',');
+    if (parts.length !== 2) {
+      throw new Error('Malformed data URL');
+    }
+
+    const header = parts[0]; // e.g., "data:image/png;base64"
+    const base64Data = parts[1]; // The actual base64 string
+
+    // Extract MIME type
+    const mimeMatch = header.match(/^data:([^;]+)/);
+    if (!mimeMatch) {
+      throw new Error('Invalid MIME type');
+    }
+    const mimeString = mimeMatch[1];
+
+    // Decode base64
+    const byteString = atob(base64Data);
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    
+    // Create Blob from ArrayBuffer
+    const blob = new Blob([ab], { type: mimeString });
+    
+    // Create object URL and trigger download
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Download error details:', { error, dataUrl: dataUrl?.substring(0, 100) });
+    throw new Error(`Failed to download file: ${error.message}`);
+  }
+}
+
 function App() {
   const [showPopup, setShowPopup] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', photo: null });
@@ -104,6 +159,16 @@ function App() {
         }
       });
       
+      // Validate response data URLs
+      if (res.pdf && !res.pdf.startsWith('data:')) {
+        console.warn('Invalid PDF URL format:', res.pdf?.substring(0, 100));
+        throw new Error('Invalid PDF format received from server');
+      }
+      if (res.badge && !res.badge.startsWith('data:')) {
+        console.warn('Invalid Badge URL format:', res.badge?.substring(0, 100));
+        throw new Error('Invalid Badge format received from server');
+      }
+
       setUploadStage('completed');
       setPdfUrl(res.pdf);
       setBadgeUrl(res.badge);
@@ -111,6 +176,7 @@ function App() {
       setShowPopup(false);
       setForm({ name: '', phone: '', photo: null });
     } catch (err) {
+      console.error('Registration error:', err);
       setError(err.message || 'Registration failed');
     } finally {
       setLoading(false);
@@ -150,27 +216,33 @@ function App() {
         <button className="main" onClick={() => setShowPopup(true)}>{t('register')}</button>
         {pdfUrl && (
           <>
-            <a
-              href={pdfUrl}
+            <button
               className="main"
               style={{ marginLeft: 16 }}
-              download="registration-certificate.pdf"
-              target="_blank"
-              rel="noopener noreferrer"
+              onClick={() => {
+                try {
+                  downloadDataUrl(pdfUrl, 'registration-certificate.pdf');
+                } catch (err) {
+                  setError(err.message);
+                }
+              }}
             >
               📄 {t('download')} PDF
-            </a>
+            </button>
             {badgeUrl && (
-              <a
-                href={badgeUrl}
+              <button
                 className="main"
                 style={{ marginLeft: 16 }}
-                download="voting-badge.png"
-                target="_blank"
-                rel="noopener noreferrer"
+                onClick={() => {
+                  try {
+                    downloadDataUrl(badgeUrl, 'voting-badge.png');
+                  } catch (err) {
+                    setError(err.message);
+                  }
+                }}
               >
                 🗳🏷️ {t('download')} Badge
-              </a>
+              </button>
             )}
           </>
         )}
