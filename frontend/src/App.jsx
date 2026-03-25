@@ -1,5 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import './App.css';
+import { t, getCurrentLanguage } from './translations.js';
+import { registerUser } from './api.js';
 
 function App() {
   const [showPopup, setShowPopup] = useState(false);
@@ -11,6 +13,16 @@ function App() {
   const [error, setError] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStage, setUploadStage] = useState('');
+  const [retryCount, setRetryCount] = useState(0);
+  const [lang, setLang] = useState(getCurrentLanguage());
+  const [forceUpdate, setForceUpdate] = useState(0);
+
+  // Re-render when language changes
+  useEffect(() => {
+    const handleLanguageChange = () => setForceUpdate(prev => prev + 1);
+    window.addEventListener('languagechange', handleLanguageChange);
+    return () => window.removeEventListener('languagechange', handleLanguageChange);
+  }, []);
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
@@ -106,25 +118,30 @@ function App() {
       setUploadStage('');
     }
   };
-
-  const switchLang = (lng) => {
-    i18n.changeLanguage(lng);
-    setLang(lng);
-  };
-
+    
+    
+  
   return (
     <div className="container">
       <div className="lang-switch">
         <span>{t('language')}: </span>
         <button
           className={lang === 'ta' ? 'active' : ''}
-          onClick={() => switchLang('ta')}
+          onClick={() => {
+            setLang('ta');
+            localStorage.setItem('language', 'ta');
+            window.dispatchEvent(new Event('languagechange'));
+          }}
         >
           {t('tamil')}
         </button>
         <button
           className={lang === 'en' ? 'active' : ''}
-          onClick={() => switchLang('en')}
+          onClick={() => {
+            setLang('en');
+            localStorage.setItem('language', 'en');
+            window.dispatchEvent(new Event('languagechange'));
+          }}
         >
           {t('english')}
         </button>
@@ -152,7 +169,7 @@ function App() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                🗳️ Download Badge
+                🗳🏷️ {t('download')} Badge
               </a>
             )}
           </>
@@ -305,22 +322,22 @@ function App() {
       {/* Success Message */}
       {pdfUrl && badgeUrl && (
         <div className="success-message">
-          <h3>🎉 Registration Successful!</h3>
-          <p>Your certificate and voting badge are ready for download.</p>
+          <h3>{t('registrationSuccess')}</h3>
+          <p>{t('downloadInfo')}</p>
           <div className="download-info">
             <div className="download-item">
               <h4>
                 <span className="icon">📄</span>
-                Registration Certificate
+                {t('registrationCertificate')}
               </h4>
-              <p>Official certificate with your details and photo. Perfect for printing and verification.</p>
+              <p>{t('certificateDesc')}</p>
             </div>
             <div className="download-item">
               <h4>
                 <span className="icon">🗳️</span>
-                Voting Badge
+                {t('votingBadge')}
               </h4>
-              <p>Show your voting pride with this official Election Commission badge. Perfect for sharing on social media!</p>
+              <p>{t('badgeDesc')}</p>
             </div>
           </div>
         </div>
