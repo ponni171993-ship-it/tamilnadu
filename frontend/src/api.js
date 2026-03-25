@@ -44,10 +44,10 @@ export async function registerUser(form, onProgress) {
       reject(new Error('Network error - failed to connect to server'));
     });
 
-    // Use different URLs for local development vs AWS Amplify
+    // Use different URLs for local development vs production
     const apiUrl = window.location.hostname === 'localhost' 
       ? 'http://localhost:4000/register' 
-      : '/register'; // Amplify Function API Gateway path
+      : '/api/register'; // Vercel Serverless Function
     
     xhr.open('POST', apiUrl);
     xhr.send(formData);

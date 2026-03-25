@@ -3,14 +3,13 @@ backend:
   phases:
     preBuild:
       commands:
-        - npm install express multer cors dotenv
+        - npm install express multer cors dotenv @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb
     build:
       commands:
         - echo "Build completed"
   runtime:
     name: nodejs18.x
   environment:
-    MONGODB_URI: ${MONGODB_URI}
     _AWS_ACCESS_KEY_ID: ${_AWS_ACCESS_KEY_ID}
     _AWS_SECRET_ACCESS_KEY: ${_AWS_SECRET_ACCESS_KEY}
     _AWS_REGION: ${_AWS_REGION}

@@ -36,7 +36,6 @@ functions:
     runtime: nodejs18.x
     handler: index.handler
     environment:
-      MONGODB_URI: ${MONGODB_URI}
       _AWS_ACCESS_KEY_ID: ${_AWS_ACCESS_KEY_ID}
       _AWS_SECRET_ACCESS_KEY: ${_AWS_SECRET_ACCESS_KEY}
       _AWS_REGION: ${_AWS_REGION}
@@ -46,3 +45,11 @@ functions:
       restApiRootResourceId: !Ref APIGatewayRootResourceId
       path: /register
       method: POST
+    iamRoleStatements:
+      - Effect: Allow
+        Action:
+          - dynamodb:GetItem
+          - dynamodb:PutItem
+          - dynamodb:Query
+          - dynamodb:Scan
+        Resource: arn:aws:dynamodb:*:*:table/users

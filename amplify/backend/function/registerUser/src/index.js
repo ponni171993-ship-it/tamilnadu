@@ -5,11 +5,56 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { DynamoDBDocumentClient, PutCommand, GetCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
 
-// Use existing badge design - no duplicate code needed
+// Import your existing working utilities
+import { generateUserPDF } from '../../../backend/pdfUtil.js';
+import { generateVotingBadge, generateSimpleVotingBadge } from '../../../backend/votingBadgeUtil.js';
 
 // Load environment variables
 dotenv.config();
+
+// Initialize DynamoDB
+const ddbClient = new DynamoDBClient({ region: process.env._AWS_REGION || 'eu-north-1' });
+const docClient = DynamoDBDocumentClient.from(ddbClient);
+const TABLE_NAME = 'users';
+
+// DynamoDB functions
+const checkDuplicatePhone = async (phone) => {
+  try {
+    const command = new GetCommand({
+      TableName: TABLE_NAME,
+      Key: { phone }
+    });
+    const response = await docClient.send(command);
+    return response.Item;
+  } catch (error) {
+    console.error('Error checking duplicate phone:', error);
+    return null;
+  }
+};
+
+const saveUser = async (userData) => {
+  try {
+    const command = new PutCommand({
+      TableName: TABLE_NAME,
+      Item: {
+        phone: userData.phone,
+        name: userData.name,
+        pdf_path: userData.pdf_path,
+        photo_path: userData.photo_path,
+        registeredAt: userData.registeredAt.toISOString()
+      }
+    });
+    await docClient.send(command);
+    console.log('✅ User saved to DynamoDB:', userData.phone);
+    return true;
+  } catch (error) {
+    console.error('Error saving user:', error);
+    return false;
+  }
+};
 
 // Use underscore-prefixed environment variables for AWS
 const AWS_CONFIG = {
@@ -19,14 +64,7 @@ const AWS_CONFIG = {
   S3_BUCKET_NAME: process.env._AWS_S3_BUCKET_NAME
 };
 
-// Validate environment variables
-if (!process.env.MONGODB_URI) {
-  console.warn('⚠️ MONGODB_URI not configured - using mock database');
-}
-
-if (!AWS_CONFIG.ACCESS_KEY_ID || !AWS_CONFIG.SECRET_ACCESS_KEY) {
-  console.warn('⚠️ AWS credentials not configured - using mock data');
-}
+console.log('✅ DynamoDB initialized for AWS region:', AWS_CONFIG.REGION);
 
 if (!AWS_CONFIG.S3_BUCKET_NAME) {
   console.warn('⚠️ S3 bucket name not configured - using mock data');
@@ -60,22 +98,11 @@ const upload = multer({
   }
 });
 
-// Mock MongoDB connection (replace with real MongoDB in production)
-const mockDatabase = {
-  users: [],
-  findByPhone: function(phone) {
-    return this.users.find(user => user.phone === phone);
-  },
-  save: function(userData) {
-    userData.id = Date.now().toString();
-    this.users.push(userData);
-    return userData;
-  }
-};
-
 // Registration endpoint
 export const handler = async (event) => {
   try {
+    console.log('🚀 Registration handler called with DynamoDB');
+    
     // Parse the event body
     const { name, phone, photo } = JSON.parse(event.body);
     
@@ -113,8 +140,8 @@ export const handler = async (event) => {
       };
     }
     
-    // Check for duplicate
-    const existingUser = mockDatabase.findByPhone(phone);
+    // Check for duplicate in DynamoDB
+    const existingUser = await checkDuplicatePhone(phone);
     if (existingUser) {
       return {
         statusCode: 409,
@@ -126,26 +153,71 @@ export const handler = async (event) => {
       };
     }
     
-    // Generate mock PDF and badge
+    // Generate real PDF and badge using your existing working code
     const registrationId = `REG${Date.now()}${Math.floor(Math.random() * 1000)}`;
     
-    // Mock PDF data (base64)
-    const mockPDF = 'JVBERi0xLjQKJeLjz9MKMSAwIG9iago8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PgplbmRvYmoKMiAwIG9iago8PC9UeXBlL1BhZ2UvUGFyZW50IDMgMCBSL1Jlc291cmNlczw8L0ZvbnQ8PC9GMSA0IDAgUj4+Pj4vTWVkaWFCb3hbWCAwIDAgNjEyIDc5Ml0+Pj4KZW5kb2JqCjMgMCBvYmoKPDwvVHlwZS9QYWdlcy9Db3VudCAxL0tpZHNbMiAwIF0+PgplbmRvYmoKNCAwIG9iago8PC9UeXBlL0ZvbnQvU3VidHlwZS9UeXBlMS9CYXNlRm9udC9IZWx2ZXRpY2E+PgplbmRvYmoKeHJlZgowIDUKJSVFT0Y=';
+    // Generate PDF using your existing utility
+    let pdfBase64 = null;
+    try {
+      const pdfBuffer = await generateUserPDF({
+        name,
+        phone,
+        userPhotoBuffer: Buffer.from(photo, 'base64'), // Convert base64 photo back to buffer
+        userId: phone,
+        outputDir: '/tmp' // Use temp directory for Amplify
+      });
+      pdfBase64 = pdfBuffer.toString('base64');
+      console.log('✅ PDF generated successfully');
+    } catch (pdfError) {
+      console.error('❌ PDF generation error:', pdfError);
+    }
     
-    // Create a simple visible badge (blue rectangle)
-    const badgeBase64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAALEwAACxMBAJqcGAAAAVlpVFh0WE1MOmNvbS5hZG9iZS54bXAAAAAAADx4OnhtcG1ldGEgeG1sbnM6eD0iYWRvYmU6bnM6bWV0YS8iIHg6eG1wdGs9IlhNUCBDb3JlIDUuNC4wIj4KICAgPHJkZjpSREYgeG1sbnM6cmRmPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5LzAyLzIyLXJkZi1zeW50YXgtbnMjIj4KICAgICAgPHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9IiIKICAgICAgICAgICAgeG1sbnM6dGlmZj0iaHR0cDovL25zLmFkb2JlLmNvbS90aWZmLzEuMC8iPgogICAgICAgICA8dGlmZjpPcmllbnRhdGlvbj4xPC90aWZmOk9yaWVudGF0aW9uPgogICAgICA8L3JkZjpEZXNjcmlwdGlvbj4KICAgPC9yZGY6UkRGPgo8L3g6eG1wbWV0YT4KTMInWQAAABxJREFUGBljZGBg+M9AAWCiIFgYBiiwAAG0BIBJgAAAAASUVORK5CYII=';
+    // Generate badge using your existing voting badge utility
+    let badgeBase64 = null;
+    try {
+      console.log('🎨 Starting badge generation...');
+      const votingBadgeBuffer = await generateVotingBadge({ 
+        name: name.trim(), 
+        phone: phone.trim(), 
+        userPhotoBuffer: Buffer.from(photo, 'base64') 
+      });
+      badgeBase64 = `data:image/png;base64,${votingBadgeBuffer.toString('base64')}`;
+      console.log('✅ Badge generated successfully');
+    } catch (badgeError) {
+      console.error('❌ Badge generation error:', badgeError);
+      // Fallback to simple badge if voting badge fails
+      try {
+        const simpleBadgeBuffer = await generateSimpleVotingBadge({ 
+          name: name.trim(), 
+          phone: phone.trim() 
+        });
+        badgeBase64 = `data:image/png;base64,${simpleBadgeBuffer.toString('base64')}`;
+        console.log('✅ Simple badge generated as fallback');
+      } catch (simpleBadgeError) {
+        console.error('❌ Even simple badge failed:', simpleBadgeError);
+      }
+    }
     
-    // Save to mock database
+    // Save to DynamoDB
     const userData = {
-      registrationId,
-      name,
-      phone,
-      pdfUrl: `data:application/pdf;base64,${mockPDF}`,
-      badgeUrl: badgeBase64,
-      registeredAt: new Date().toISOString()
+      name: name.trim(),
+      phone: phone.trim(),
+      pdf_path: `user-${phone}.pdf`,
+      photo_path: `photo-${phone}.jpeg`,
+      registeredAt: new Date()
     };
     
-    mockDatabase.save(userData);
+    const saved = await saveUser(userData);
+    if (!saved) {
+      return {
+        statusCode: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        },
+        body: JSON.stringify({ error: 'Failed to save user data' })
+      };
+    }
     
     // Return success response
     return {
@@ -159,7 +231,7 @@ export const handler = async (event) => {
         registrationId,
         name,
         phone,
-        pdf: `data:application/pdf;base64,${mockPDF}`,
+        pdf: pdfBase64 ? `data:application/pdf;base64,${pdfBase64}` : null,
         badge: badgeBase64,
         message: 'Registration successful'
       })
